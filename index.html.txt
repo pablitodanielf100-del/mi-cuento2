@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cuento — Lectura y navegación por páginas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    * { -webkit-tap-highlight-color: rgba(0,0,0,0); }
+    
+    .fade-enter {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    .fade-enter-active {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 220ms ease, transform 220ms ease;
+    }
+    
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 9999px;
+    }
+    
+    .page-image {
+      object-fit: cover;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .focus-ring:focus {
+      outline: 2px solid #22d3ee;
+      outline-offset: 2px;
+    }
+
+    .upload-zone {
+      border: 2px dashed #d4d4d8;
+      transition: all 0.3s ease;
+    }
+    
+    .upload-zone:hover {
+      border-color: #06b6d4;
+      background-color: #f0fdff;
+    }
+    
+    .image-preview {
+      max-width: 100px;
+      max-height: 100px;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body class="h-full bg-zinc-50 text-zinc-900">
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200">
+    <div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
+      <h1 class="text-xl font-semibold">Mi Cuento Interactivo</h1>
+      <div class="flex items-center gap-2">
+        <button id="editBtn" class="focus-ring inline-flex items-center gap-2 px-3 py-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 text-sm">
+          ?? Editar contenido
+        </button>
+        <button id="prevBtn" class="focus-ring inline-flex items-center gap-2 px-3 py-2 rounded-md bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-sm">
+          ? Anterior
+        </button>
+        <button id="nextBtn" class="focus-ring inline-flex items-center gap-2 px-3 py-2 rounded-md bg-zinc-800 text-white hover:bg-zinc-700 text-sm">
+          Siguiente ?
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Modal de edición -->
+  <div id="editModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="sticky top-0 bg-white border-b border-zinc-200 p-4 flex items-center justify-between">
+        <h2 class="text-xl font-semibold">Editar páginas del cuento</h2>
+        <button id="closeModal" class="text-zinc-500 hover:text-zinc-700 text-2xl leading-none">&times;</button>
+      </div>
+      
+      <div id="pagesEditor" class="p-4 space-y-4">
+        <!-- Se llenará dinámicamente -->
+      </div>
+      
+      <div class="sticky bottom-0 bg-white border-t border-zinc-200 p-4 space-y-3">
+        <div class="flex justify-between gap-2">
+          <button id="addPageBtn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm">
+            + Agregar página
+          </button>
+          <button id="saveBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 text-sm">
+            ?? Guardar cambios
+          </button>
+        </div>
+        <div class="flex gap-2">
+          <button id="downloadBtn" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm">
+            ?? Descargar cuento
+          </button>
+          <button id="loadBtn" class="flex-1 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 text-sm">
+            ?? Cargar cuento
+          </button>
+          <input type="file" id="loadFileInput" accept=".json" class="hidden">
+        </div>
+        <div class="text-xs text-zinc-600 text-center">
+          Descarga tu cuento para abrirlo en cualquier dispositivo
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="mx-auto max-w-4xl px-4 py-6">
+    <div class="mb-4">
+      <div class="flex items-center justify-between text-sm text-zinc-600">
+        <span id="progressLabel">Página 1 de 8</span>
+        <button id="toggleViewBtn" class="focus-ring px-3 py-1.5 rounded-md border border-zinc-300 hover:bg-zinc-100">
+          Ver cuento completo
+        </button>
+      </div>
+      <div class="mt-2 h-2 w-full bg-zinc-200 rounded-full overflow-hidden">
+        <div id="progressBar" class="h-full bg-cyan-500 rounded-full transition-all" style="width: 12.5%;"></div>
+      </div>
+    </div>
+
+    <section id="singleView" class="space-y-4">
+      <article id="pageContainer" class="fade-enter-active rounded-lg border border-zinc-200 overflow-hidden bg-white shadow-sm">
+        <img id="pageImage" alt="Imagen de la página" class="page-image w-full h-64 sm:h-72 md:h-80" src="" />
+        <div class="p-5">
+          <h2 id="pageTitle" class="text-lg font-semibold mb-2">Título de la página</h2>
+          <p id="pageText" class="leading-relaxed text-zinc-800"></p>
+        </div>
+      </article>
+
+      <div class="flex items-center justify-between">
+        <button id="prevBtn2" class="focus-ring inline-flex items-center gap-2 px-3 py-2 rounded-md bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-sm">
+          ? Anterior
+        </button>
+        <div id="dots" class="flex items-center gap-2"></div>
+        <button id="nextBtn2" class="focus-ring inline-flex items-center gap-2 px-3 py-2 rounded-md bg-zinc-800 text-white hover:bg-zinc-700 text-sm">
+          Siguiente ?
+        </button>
+      </div>
+    </section>
+
+    <section id="fullView" class="hidden space-y-6 mt-4"></section>
+  </main>
+
+  <footer class="mx-auto max-w-4xl px-4 pb-8 text-center text-sm text-zinc-500">
+    Usa las flechas del teclado, desliza en móvil, o los botones para navegar.
+  </footer>
+
+  <script>
+    // Datos del cuento (iniciales)
+    let cuento = [
+      {
+        titulo: "Comienzo",
+        texto: "Era una tarde silenciosa. El viento traía el olor de los eucaliptos y el río murmuraba con paciencia. En la casa, sólo se oía el reloj marcando el paso del tiempo.",
+        imagen: null
+      },
+      {
+        titulo: "El primer encuentro",
+        texto: "En el jardín, una figura conocida apareció al borde del sendero. No había prisa; ambos sabían que, a veces, llegar es más importante que explicar.",
+        imagen: null
+      },
+      {
+        titulo: "La carta",
+        texto: "Sobre la mesa, una carta sin remitente. Las palabras parecían escondidas entre líneas, esperando el momento justo para ser leídas en voz alta.",
+        imagen: null
+      },
+      {
+        titulo: "El río dice",
+        texto: "El río, siempre discreto, traía historias de otros pueblos. Sus rumores eran un mapa para quien quisiera escucharlos sin miedo.",
+        imagen: null
+      },
+      {
+        titulo: "Memoria",
+        texto: "La memoria juega con luces y sombras. Algunos recuerdos se vuelven claros cuando se los mira con ternura.",
+        imagen: null
+      },
+      {
+        titulo: "Decisión",
+        texto: "Elegir no es negar; es abrir una puerta y aceptar que habrá otras que queden cerradas por un rato.",
+        imagen: null
+      },
+      {
+        titulo: "Camino",
+        texto: "El camino hacia la ciudad parecía más corto esa mañana. Tal vez porque el corazón, por fin, había dejado de resistirse.",
+        imagen: null
+      },
+      {
+        titulo: "Cierre",
+        texto: "La noche llegó con calma. Hubo una última mirada, una palabra sencilla, y el silencio volvió a ser un lugar seguro.",
+        imagen: null
+      }
+    ];
+
+    let paginaActual = 0;
+    let modoCompleto = false;
+
+    // Referencias
+    const pageContainer = document.getElementById("pageContainer");
+    const pageImage = document.getElementById("pageImage");
+    const pageTitle = document.getElementById("pageTitle");
+    const pageText = document.getElementById("pageText");
+
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const prevBtn2 = document.getElementById("prevBtn2");
+    const nextBtn2 = document.getElementById("nextBtn2");
+    const toggleViewBtn = document.getElementById("toggleViewBtn");
+    const editBtn = document.getElementById("editBtn");
+
+    const dots = document.getElementById("dots");
+    const progressBar = document.getElementById("progressBar");
+    const progressLabel = document.getElementById("progressLabel");
+
+    const singleView = document.getElementById("singleView");
+    const fullView = document.getElementById("fullView");
+
+    const editModal = document.getElementById("editModal");
+    const closeModal = document.getElementById("closeModal");
+    const pagesEditor = document.getElementById("pagesEditor");
+    const addPageBtn = document.getElementById("addPageBtn");
+    const saveBtn = document.getElementById("saveBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const loadBtn = document.getElementById("loadBtn");
+    const loadFileInput = document.getElementById("loadFileInput");
+
+    // Render de una página
+    function renderPagina(i, animate = true) {
+      const p = cuento[i];
+      if (!p) return;
+
+      if (animate) {
+        pageContainer.classList.remove("fade-enter-active");
+        pageContainer.classList.add("fade-enter");
+        requestAnimationFrame(() => {
+          pageContainer.classList.remove("fade-enter");
+          pageContainer.classList.add("fade-enter-active");
+        });
+      }
+
+      pageImage.src = p.imagen || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400"><rect width="800" height="400" fill="%23667eea"/><text x="50%" y="50%" text-anchor="middle" fill="white" font-size="24">Sin imagen</text></svg>';
+      pageImage.alt = `Imagen: ${p.titulo}`;
+      pageTitle.textContent = p.titulo;
+      pageText.textContent = p.texto;
+
+      paginaActual = i;
+      actualizarUI();
+    }
+
+    // Render del cuento completo
+    function renderCuentoCompleto() {
+      fullView.innerHTML = "";
+      cuento.forEach((p, idx) => {
+        const card = document.createElement("article");
+        card.className = "rounded-lg border border-zinc-200 overflow-hidden bg-white shadow-sm";
+
+        const img = document.createElement("img");
+        img.src = p.imagen || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400"><rect width="800" height="400" fill="%23764ba2"/><text x="50%" y="50%" text-anchor="middle" fill="white" font-size="24">Sin imagen</text></svg>';
+        img.alt = `Imagen: ${p.titulo}`;
+        img.className = "page-image w-full h-64 sm:h-72 md:h-80";
+        card.appendChild(img);
+
+        const body = document.createElement("div");
+        body.className = "p-5";
+        const h2 = document.createElement("h2");
+        h2.className = "text-lg font-semibold mb-2";
+        h2.textContent = `${idx + 1}. ${p.titulo}`;
+        const text = document.createElement("p");
+        text.className = "leading-relaxed text-zinc-800";
+        text.textContent = p.texto;
+        body.appendChild(h2);
+        body.appendChild(text);
+
+        card.appendChild(body);
+        fullView.appendChild(card);
+      });
+    }
+
+    // Dots de navegación
+    function renderDots() {
+      dots.innerHTML = "";
+      cuento.forEach((_, idx) => {
+        const b = document.createElement("button");
+        b.className = "dot focus-ring border border-zinc-300 " +
+          (idx === paginaActual ? "bg-cyan-500" : "bg-white");
+        b.setAttribute("aria-label", `Ir a la página ${idx + 1}`);
+        b.addEventListener("click", () => renderPagina(idx));
+        dots.appendChild(b);
+      });
+    }
+
+    // Actualiza UI
+    function actualizarUI() {
+      const total = cuento.length;
+      progressLabel.textContent = `Página ${paginaActual + 1} de ${total}`;
+      const pct = ((paginaActual + 1) / total) * 100;
+      progressBar.style.width = `${pct}%`;
+
+      prevBtn.disabled = paginaActual === 0;
+      prevBtn2.disabled = paginaActual === 0;
+      nextBtn.disabled = paginaActual === total - 1;
+      nextBtn2.disabled = paginaActual === total - 1;
+
+      renderDots();
+    }
+
+    // Toggle vista completa
+    function toggleVistaCompleta() {
+      modoCompleto = !modoCompleto;
+      if (modoCompleto) {
+        toggleViewBtn.textContent = "Ver una página";
+        singleView.classList.add("hidden");
+        fullView.classList.remove("hidden");
+        renderCuentoCompleto();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        toggleViewBtn.textContent = "Ver cuento completo";
+        fullView.classList.add("hidden");
+        singleView.classList.remove("hidden");
+        renderPagina(paginaActual, false);
+      }
+    }
+
+    // Navegación
+    function irAnterior() {
+      if (paginaActual > 0) renderPagina(paginaActual - 1);
+    }
+    function irSiguiente() {
+      if (paginaActual < cuento.length - 1) renderPagina(paginaActual + 1);
+    }
+
+    // Editor de páginas
+    function renderEditor() {
+      pagesEditor.innerHTML = "";
+      cuento.forEach((p, idx) => {
+        const pageDiv = document.createElement("div");
+        pageDiv.className = "border border-zinc-300 rounded-lg p-4 bg-zinc-50";
+        
+        pageDiv.innerHTML = `
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-lg">Página ${idx + 1}</h3>
+            <button class="delete-page text-red-600 hover:text-red-800 text-sm" data-idx="${idx}">??? Eliminar</button>
+          </div>
+          
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">Título</label>
+              <input type="text" class="page-titulo w-full px-3 py-2 border border-zinc-300 rounded-md" value="${p.titulo}" data-idx="${idx}">
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium mb-1">Texto</label>
+              <textarea class="page-texto w-full px-3 py-2 border border-zinc-300 rounded-md" rows="4" data-idx="${idx}">${p.texto}</textarea>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium mb-1">Imagen</label>
+              <div class="flex items-center gap-3">
+                ${p.imagen ? `<img src="${p.imagen}" class="image-preview rounded border border-zinc-300">` : '<div class="w-24 h-24 bg-zinc-200 rounded flex items-center justify-center text-xs text-zinc-500">Sin imagen</div>'}
+                <input type="file" accept="image/*" class="page-imagen text-sm" data-idx="${idx}">
+              </div>
+            </div>
+          </div>
+        `;
+        
+        pagesEditor.appendChild(pageDiv);
+      });
+
+      // Event listeners para eliminar páginas
+      document.querySelectorAll(".delete-page").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          if (confirm(`¿Eliminar la página ${idx + 1}?`)) {
+            cuento.splice(idx, 1);
+            renderEditor();
+          }
+        });
+      });
+
+      // Event listeners para cargar imágenes
+      document.querySelectorAll(".page-imagen").forEach(input => {
+        input.addEventListener("change", (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+              cuento[idx].imagen = evt.target.result;
+              renderEditor();
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      });
+    }
+
+    // Abrir/cerrar modal
+    editBtn.addEventListener("click", () => {
+      editModal.classList.remove("hidden");
+      renderEditor();
+    });
+
+    closeModal.addEventListener("click", () => {
+      editModal.classList.add("hidden");
+    });
+
+    // Agregar página
+    addPageBtn.addEventListener("click", () => {
+      cuento.push({
+        titulo: "Nueva página",
+        texto: "Escribe aquí el contenido de esta página...",
+        imagen: null
+      });
+      renderEditor();
+    });
+
+    // Guardar cambios
+    saveBtn.addEventListener("click", () => {
+      // Actualizar títulos y textos
+      document.querySelectorAll(".page-titulo").forEach(input => {
+        const idx = parseInt(input.dataset.idx);
+        cuento[idx].titulo = input.value;
+      });
+      
+      document.querySelectorAll(".page-texto").forEach(textarea => {
+        const idx = parseInt(textarea.dataset.idx);
+        cuento[idx].texto = textarea.value;
+      });
+
+      editModal.classList.add("hidden");
+      renderPagina(paginaActual, false);
+      if (modoCompleto) renderCuentoCompleto();
+      alert("¡Cambios guardados!");
+    });
+
+    // Descargar cuento
+    downloadBtn.addEventListener("click", () => {
+      const dataStr = JSON.stringify(cuento, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'mi-cuento.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      alert("¡Cuento descargado! Ahora puedes abrirlo en cualquier dispositivo.");
+    });
+
+    // Cargar cuento
+    loadBtn.addEventListener("click", () => {
+      loadFileInput.click();
+    });
+
+    loadFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const loadedCuento = JSON.parse(evt.target.result);
+            if (Array.isArray(loadedCuento) && loadedCuento.length > 0) {
+              cuento = loadedCuento;
+              paginaActual = 0;
+              renderPagina(0, false);
+              if (modoCompleto) renderCuentoCompleto();
+              editModal.classList.add("hidden");
+              alert("¡Cuento cargado exitosamente!");
+            } else {
+              alert("El archivo no tiene el formato correcto.");
+            }
+          } catch (error) {
+            alert("Error al cargar el archivo. Asegúrate de que sea un archivo de cuento válido.");
+          }
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    // Eventos de navegación
+    prevBtn.addEventListener("click", irAnterior);
+    prevBtn2.addEventListener("click", irAnterior);
+    nextBtn.addEventListener("click", irSiguiente);
+    nextBtn2.addEventListener("click", irSiguiente);
+    toggleViewBtn.addEventListener("click", toggleVistaCompleta);
+
+    // Teclado
+    window.addEventListener("keydown", (e) => {
+      if (modoCompleto) return;
+      if (e.key === "ArrowLeft") irAnterior();
+      if (e.key === "ArrowRight") irSiguiente();
+    });
+
+    // Gestos táctiles
+    let touchStartX = null;
+    pageContainer.addEventListener("touchstart", (e) => {
+      touchStartX = e.changedTouches[0].clientX;
+    }, { passive: true });
+    pageContainer.addEventListener("touchend", (e) => {
+      if (touchStartX === null) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const threshold = 40;
+      if (dx > threshold) irAnterior();
+      if (dx < -threshold) irSiguiente();
+      touchStartX = null;
+    });
+
+    // Inicio
+    renderPagina(0, false);
+  </script>
+</body>
+</html>
